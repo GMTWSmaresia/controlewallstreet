@@ -28,6 +28,9 @@
         #chartjs-tooltip table { margin: 0; border-collapse: collapse; width: 100%;}
         #chartjs-tooltip th, #chartjs-tooltip td { border: none; padding: 4px 0; text-align: left;}
         #chartjs-tooltip .tooltip-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+        .ai-chat-bubble { max-width: 80%; padding: 10px 15px; border-radius: 15px; }
+        .ai-chat-user { background-color: #007bff; color: white; align-self: flex-end; border-bottom-right-radius: 0; }
+        .ai-chat-gemini { background-color: #333; color: white; align-self: flex-start; border-bottom-left-radius: 0;}
     </style>
 </head>
 <body class="p-4 sm:p-6 md:p-8">
@@ -36,6 +39,7 @@
         <header class="flex flex-col sm:flex-row justify-between items-center mb-8">
             <h1 class="text-2xl md:text-3xl font-bold text-white mb-4 sm:mb-0">CONTROLE DE PASTAS WALLSTREET</h1>
             <div class="flex items-center space-x-4">
+                 <button id="open-ai-chat-btn" class="text-white font-semibold py-2 px-6 rounded-lg bg-purple-600 hover:bg-purple-700 transition-colors">Análise IA</button>
                 <button id="open-fill-modal-btn" class="text-white font-semibold py-2 px-6 rounded-lg btn-action">PREENCHER</button>
                 <input type="date" id="main-date-filter" class="bg-yellow-400 text-black font-bold py-2 px-4 rounded-lg cursor-pointer">
             </div>
@@ -125,6 +129,21 @@
             </div>
         </div>
     </div>
+    <div id="ai-chat-modal" class="fixed inset-0 modal-bg items-center justify-center hidden z-50">
+        <div class="modal-content rounded-xl p-6 w-full max-w-2xl h-[80vh] flex flex-col">
+            <h2 class="text-xl font-bold text-white mb-4">Análise com IA</h2>
+            <div id="ai-chat-messages" class="flex-grow overflow-y-auto space-y-4 p-4 bg-black/20 rounded-lg">
+                <!-- Chat messages will appear here -->
+            </div>
+            <div class="mt-4 flex gap-2">
+                <input type="text" id="ai-chat-input" class="w-full p-2 input-field" placeholder="Pergunte algo sobre seus dados...">
+                <button id="ai-chat-send" class="bg-purple-600 text-white font-bold py-2 px-6 rounded-lg hover:bg-purple-700">Enviar</button>
+            </div>
+            <div class="flex justify-end mt-4">
+                <button id="close-ai-chat-modal-btn" class="py-2 px-6 rounded-lg btn-action">Fechar</button>
+            </div>
+        </div>
+    </div>
 
     <script>
         // --- SCRIPT START --- //
@@ -158,7 +177,7 @@
         };
 
         // --- MODAL HANDLING & DYNAMIC CONTENT --- //
-        const fillModal = document.getElementById('fill-modal'), consultModal = document.getElementById('consult-modal'), anotacaoModal = document.getElementById('anotacao-modal');
+        const fillModal = document.getElementById('fill-modal'), consultModal = document.getElementById('consult-modal'), anotacaoModal = document.getElementById('anotacao-modal'), aiChatModal = document.getElementById('ai-chat-modal');
         const openModal = (modal) => { modal.classList.remove('hidden'); modal.classList.add('flex'); }
         const closeModal = (modal) => { modal.classList.add('hidden'); modal.classList.remove('flex'); }
         document.getElementById('open-fill-modal-btn').addEventListener('click', () => { document.getElementById('fill-date').value = getTodayString(); openModal(fillModal); });
@@ -177,6 +196,8 @@
             openModal(anotacaoModal);
         }));
         document.getElementById('close-anotacao-modal-btn').addEventListener('click', () => closeModal(anotacaoModal));
+        document.getElementById('open-ai-chat-btn').addEventListener('click', () => openModal(aiChatModal));
+        document.getElementById('close-ai-chat-modal-btn').addEventListener('click', () => closeModal(aiChatModal));
 
         const resetFillModal = () => { document.getElementById('fill-modal-content').querySelectorAll('input, select').forEach(el => { if (el.type === 'text' || el.type === 'number') el.value = ''; else if (el.tagName === 'SELECT') el.selectedIndex = 0; }); document.getElementById('fill-date').value = getTodayString(); };
         const setupFillModal = () => {
@@ -381,6 +402,93 @@
         document.getElementById('export-data-btn').addEventListener('click', () => { const dataStr = JSON.stringify(db); const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr); const exportFileDefaultName = `wallstreet_data_${getTodayString()}.json`; const linkElement = document.createElement('a'); linkElement.setAttribute('href', dataUri); linkElement.setAttribute('download', exportFileDefaultName); linkElement.click(); });
         document.getElementById('import-data-btn').addEventListener('click', () => document.getElementById('import-file-input').click());
         document.getElementById('import-file-input').addEventListener('change', (event) => { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const importedDb = JSON.parse(e.target.result); if(importedDb.dailyData && importedDb.premios && importedDb.facData) { if(confirm('Isso irá substituir todos os dados atuais. Deseja continuar?')) { db = importedDb; if (!db.notes) { db.notes = {contratados: {}, retencao: {}, fac: {}}; } saveDb(); initializeApp(); } } else { alert('Arquivo de dados inválido ou corrompido.'); } } catch (err) { alert('Erro ao ler o arquivo.'); console.error(err); } finally { event.target.value = null; } }; reader.readAsText(file); });
+
+        // --- AI CHAT LOGIC --- //
+        const aiChatMessages = document.getElementById('ai-chat-messages');
+        const aiChatInput = document.getElementById('ai-chat-input');
+        const aiChatSend = document.getElementById('ai-chat-send');
+
+        const addChatMessage = (message, sender) => {
+            const bubble = document.createElement('div');
+            bubble.className = `ai-chat-bubble ${sender === 'user' ? 'ai-chat-user' : 'ai-chat-gemini'}`;
+            bubble.textContent = message;
+            aiChatMessages.appendChild(bubble);
+            aiChatMessages.scrollTop = aiChatMessages.scrollHeight;
+        };
+        
+        const getDashboardSummary = () => {
+            const today = getTodayString();
+            const week = getWeekRange(today);
+            let summary = `Resumo do Painel para ${today}:\n\n`;
+            
+            summary += "Status Semanal (Pastas):\n";
+            const statusPastaContainer = document.querySelector('#status-semanal .space-y-3');
+            summary += statusPastaContainer.innerText + "\n\n";
+
+            summary += "Status Semanal (FACs em Foco):\n";
+            const statusFacContainer = document.querySelector('#status-semanal-fac .space-y-3');
+            summary += statusFacContainer.innerText + "\n\n";
+            
+            summary += "Dados de Hoje:\n";
+            const todayData = db.dailyData[today];
+            if(todayData){
+                for(const catId in todayData){
+                    const catName = categories.find(c => c.id === catId)?.name || catId;
+                    summary += `- ${catName}: ${todayData[catId].contratados} contratados, ${todayData[catId].retencao} retenção.\n`;
+                }
+            } else {
+                summary += "Nenhum dado preenchido para hoje.\n";
+            }
+            
+            return summary;
+        }
+
+        const handleAIChat = async () => {
+            const userMessage = aiChatInput.value.trim();
+            if (!userMessage) return;
+
+            addChatMessage(userMessage, 'user');
+            aiChatInput.value = '';
+            addChatMessage('Pensando...', 'gemini');
+
+            const summary = getDashboardSummary();
+            const prompt = `Com base no seguinte resumo de dados do painel, responda à pergunta do usuário.\n\nContexto:\n${summary}\n\nPergunta: ${userMessage}`;
+            
+            let chatHistory = [{ role: "user", parts: [{ text: prompt }] }];
+            const payload = { contents: chatHistory };
+            const apiKey = "";
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                
+                const aiMessageEl = aiChatMessages.lastChild;
+                if (result.candidates && result.candidates.length > 0 &&
+                    result.candidates[0].content && result.candidates[0].content.parts &&
+                    result.candidates[0].content.parts.length > 0) {
+                    const text = result.candidates[0].content.parts[0].text;
+                    aiMessageEl.textContent = text;
+                } else {
+                    aiMessageEl.textContent = "Desculpe, não consegui processar a resposta. Tente novamente.";
+                    console.error("API Response Error:", result);
+                }
+            } catch (error) {
+                const aiMessageEl = aiChatMessages.lastChild;
+                aiMessageEl.textContent = "Ocorreu um erro ao conectar com a IA. Verifique o console para mais detalhes.";
+                console.error("Fetch Error:", error);
+            }
+        };
+
+        aiChatSend.addEventListener('click', handleAIChat);
+        aiChatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') handleAIChat();
+        });
+
 
         // --- INITIALIZATION --- //
         const initializeApp = () => {
