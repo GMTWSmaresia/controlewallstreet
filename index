@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle de Pastas Wallstreet</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js Date Adapter and Zoom Plugin -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom/dist/chartjs-plugin-zoom.min.js"></script>
+    <!-- Custom Styles -->
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #000000; color: #E0E0E0; }
+        .chart-border { border-color: rgba(255, 255, 255, 0.2); }
+        .btn-action { background-color: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2); transition: background-color 0.3s; }
+        .btn-action:hover { background-color: rgba(255, 255, 255, 0.2); }
+        .modal-bg { background-color: rgba(0, 0, 0, 0.8); backdrop-filter: blur(4px); }
+        .modal-content { background-color: #111; border: 1px solid rgba(255, 255, 255, 0.2); }
+        .input-field, .select-field { background-color: #222; border: 1px solid rgba(255, 255, 255, 0.3); color: #E0E0E0; border-radius: 0.375rem; }
+        .select-field { -webkit-appearance: none; -moz-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right 0.5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2.5rem; }
+        .custom-legend { display: flex; justify-content: center; align-items: center; gap: 1.5rem; margin-top: 1rem; flex-wrap: wrap; }
+        .legend-item { display: flex; align-items: center; gap: 0.5rem; font-size: 0.75rem; }
+        .legend-dot { width: 0.625rem; height: 0.625rem; border-radius: 9999px; }
+        #chartjs-tooltip { opacity: 0; position: absolute; background: rgba(30, 30, 30, 0.9); color: white; border-radius: 8px; padding: 10px 15px; pointer-events: none; transition: all .1s ease; transform: translate(-50%, -110%); font-size: 12px; border: 1px solid rgba(255, 255, 255, 0.2); z-index: 100; }
+        #chartjs-tooltip table { margin: 0; border-collapse: collapse; }
+        #chartjs-tooltip th, #chartjs-tooltip td { border: none; padding: 2px 0; }
+        #chartjs-tooltip .tooltip-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 8px; }
+    </style>
+</head>
+<body class="p-4 sm:p-6 md:p-8">
+
+    <div class="max-w-7xl mx-auto">
+        <!-- Header Section -->
+        <header class="flex flex-col sm:flex-row justify-between items-center mb-8">
+            <h1 class="text-2xl md:text-3xl font-bold text-white mb-4 sm:mb-0">CONTROLE DE PASTAS WALLSTREET</h1>
+            <div class="flex items-center space-x-4">
+                <button id="open-fill-modal-btn" class="text-white font-semibold py-2 px-6 rounded-lg btn-action">PREENCHER</button>
+                <input type="date" id="main-date-filter" class="bg-yellow-400 text-black font-bold py-2 px-4 rounded-lg cursor-pointer">
+            </div>
+        </header>
+
+        <!-- Main Grid Layout -->
+        <main class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Linhas do Tempo -->
+            <div class="border chart-border rounded-xl p-6 flex flex-col">
+                <div class="flex flex-wrap justify-between items-center mb-4 gap-4"><h2 class="text-lg font-semibold text-white">LINHA DO TEMPO - CONTRATADOS</h2><div class="flex items-center space-x-2"><input type="date" id="compare-start-date-contratados" class="input-field p-1 text-sm" title="Data Início"><input type="date" id="compare-end-date-contratados" class="input-field p-1 text-sm" title="Data Fim"><button id="compare-btn-contratados" class="text-yellow-400 border border-yellow-400 rounded-lg py-1 px-3 text-sm font-semibold hover:bg-yellow-400 hover:text-black transition-colors">COMPARAR</button><button id="reset-zoom-contratados" class="text-white border border-gray-500 rounded-lg py-1 px-3 text-sm font-semibold btn-action">RESET</button></div></div>
+                <div class="relative flex-grow h-64"><canvas id="contratados-timeline-chart"></canvas></div><div id="timeline-contratados-legend" class="custom-legend"></div>
+            </div>
+            <div class="border chart-border rounded-xl p-6 flex flex-col">
+                <div class="flex flex-wrap justify-between items-center mb-4 gap-4"><h2 class="text-lg font-semibold text-white">LINHA DO TEMPO - RETENÇÃO</h2><div class="flex items-center space-x-2"><input type="date" id="compare-start-date-retencao" class="input-field p-1 text-sm" title="Data Início"><input type="date" id="compare-end-date-retencao" class="input-field p-1 text-sm" title="Data Fim"><button id="compare-btn-retencao" class="text-yellow-400 border border-yellow-400 rounded-lg py-1 px-3 text-sm font-semibold hover:bg-yellow-400 hover:text-black transition-colors">COMPARAR</button><button id="reset-zoom-retencao" class="text-white border border-gray-500 rounded-lg py-1 px-3 text-sm font-semibold btn-action">RESET</button></div></div>
+                <div class="relative flex-grow h-64"><canvas id="retencao-timeline-chart"></canvas></div><div id="timeline-retencao-legend" class="custom-legend"></div>
+            </div>
+
+            <!-- Gráficos Diários -->
+            <div class="border chart-border rounded-xl p-6 flex flex-col">
+                 <h2 class="text-lg font-semibold text-white mb-4">CONTRATADOS DIÁRIO</h2>
+                 <div class="relative flex-grow h-64"><canvas id="contratados-bar-chart"></canvas></div><div id="bar-contratados-legend" class="custom-legend"></div>
+            </div>
+            <div class="border chart-border rounded-xl p-6 flex flex-col">
+                <h2 class="text-lg font-semibold text-white mb-4">RETENÇÃO DIÁRIO</h2>
+                <div class="relative flex-grow h-64"><canvas id="retencao-bar-chart"></canvas></div><div id="bar-retencao-legend" class="custom-legend"></div>
+            </div>
+
+             <!-- Linha do Tempo FAC -->
+            <div class="border chart-border rounded-xl p-6 flex flex-col">
+                <div class="flex flex-wrap justify-between items-center mb-4 gap-4"><h2 class="text-lg font-semibold text-white">FACÇÕES EM FOCO</h2><div class="flex items-center space-x-2"><input type="date" id="compare-start-date-fac" class="input-field p-1 text-sm" title="Data Início"><input type="date" id="compare-end-date-fac" class="input-field p-1 text-sm" title="Data Fim"><button id="compare-btn-fac" class="text-yellow-400 border border-yellow-400 rounded-lg py-1 px-3 text-sm font-semibold hover:bg-yellow-400 hover:text-black transition-colors">COMPARAR</button><button id="reset-zoom-fac" class="text-white border border-gray-500 rounded-lg py-1 px-3 text-sm font-semibold btn-action">RESET</button></div></div>
+                <div class="relative flex-grow h-64"><canvas id="fac-timeline-chart"></canvas></div><div id="timeline-fac-legend" class="custom-legend"></div>
+            </div>
+
+            <!-- Status Semanal FAC -->
+            <div id="status-semanal-fac" class="border chart-border rounded-xl p-6">
+                <div class="flex flex-wrap justify-between items-center mb-6 gap-4"><h2 class="text-lg font-semibold text-white">STATUS SEMANAL FACS FOCO</h2><div class="flex items-center space-x-2"><input type="date" id="weekly-status-fac-date" class="input-field p-1 text-sm" title="Selecione um dia da semana"><button id="weekly-status-fac-reset" class="text-white border border-gray-500 rounded-lg py-1 px-3 text-sm font-semibold btn-action">RESET</button></div></div>
+                <div class="space-y-3"></div>
+            </div>
+            
+            <!-- Status Semanal Pastas -->
+            <div id="status-semanal" class="border chart-border rounded-xl p-6">
+                <div class="flex flex-wrap justify-between items-center mb-6 gap-4"><h2 class="text-lg font-semibold text-white">STATUS SEMANAL DAS PASTAS</h2><div class="flex items-center space-x-2"><input type="date" id="weekly-status-date" class="input-field p-1 text-sm" title="Selecione um dia da semana"><button id="weekly-status-reset" class="text-white border border-gray-500 rounded-lg py-1 px-3 text-sm font-semibold btn-action">RESET</button></div></div>
+                <div class="space-y-3"></div>
+            </div>
+
+            <!-- Rank de Prêmios -->
+            <div class="border chart-border rounded-xl p-6 flex flex-col justify-between">
+                <div><h2 class="text-lg font-semibold text-white mb-6">RANK DE PRÊMIOS (GERAL POR PASTA)</h2><div class="relative h-48 w-full"><canvas id="premios-pie-chart"></canvas></div></div>
+                <button id="open-consult-modal-btn" class="w-full mt-6 bg-yellow-400 text-black font-bold py-3 rounded-lg hover:bg-yellow-500 transition-colors">CONSULTAR RANK DIÁRIO</button>
+            </div>
+        </main>
+        
+        <!-- Data Management Section -->
+        <div class="mt-12 flex justify-center items-center gap-4">
+            <button id="export-data-btn" class="text-white font-semibold py-2 px-6 rounded-lg btn-action">Exportar Dados</button>
+            <button id="import-data-btn" class="text-white font-semibold py-2 px-6 rounded-lg btn-action">Importar Dados</button>
+            <input type="file" id="import-file-input" class="hidden" accept=".json">
+        </div>
+
+        <!-- Footer -->
+        <footer class="text-center mt-8 text-gray-500 text-sm">
+            <p>TODOS DIREITOS RESERVADOS - SHEMIAH #S3LO - 2025</p>
+        </footer>
+    </div>
+    
+    <!-- Custom Tooltip Element -->
+    <div id="chartjs-tooltip"></div>
+
+    <!-- Modals -->
+    <div id="fill-modal" class="fixed inset-0 modal-bg items-center justify-center hidden z-50">
+        <div id="fill-modal-content" class="modal-content rounded-xl p-8 w-full max-w-6xl max-h-[90vh] overflow-y-auto">
+            <h2 class="text-xl font-bold text-white mb-6">Preencher Dados</h2>
+             <div class="mb-6"><label for="fill-date" class="block text-sm font-medium text-gray-300 mb-2">Data do Registro</label><input type="date" id="fill-date" class="w-full p-2 input-field"></div>
+            <div id="fill-categories" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8"></div>
+            <h3 class="text-lg font-bold text-white mb-4 mt-6">Adicionar Prêmios (3)</h3>
+            <div id="premios-container" class="space-y-4 mb-8"></div>
+            <h3 class="text-lg font-bold text-white mb-4 mt-6">FAC em Foco (6)</h3>
+            <div id="fac-container" class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4"></div>
+            <div class="flex justify-end space-x-4 mt-8"><button id="cancel-fill-btn" class="py-2 px-6 rounded-lg btn-action">Cancelar</button><button id="save-fill-btn" class="bg-green-500 text-white font-bold py-2 px-8 rounded-lg hover:bg-green-600">Salvar</button></div>
+        </div>
+    </div>
+    <div id="consult-modal" class="fixed inset-0 modal-bg items-center justify-center hidden z-50">
+        <div class="modal-content rounded-xl p-8 w-full max-w-md">
+            <h2 class="text-xl font-bold text-white mb-6">Consultar Prêmios do Dia</h2>
+            <div class="space-y-4">
+                <div><label for="consult-date" class="block text-sm font-medium text-gray-300 mb-2">Selecione a Data</label><input type="date" id="consult-date" class="w-full p-2 input-field"></div>
+                <button id="consult-rank-btn" class="w-full bg-yellow-400 text-black font-bold py-3 rounded-lg hover:bg-yellow-500">Consultar</button>
+                <div id="consult-results" class="mt-6 text-gray-300"></div>
+            </div>
+            <div class="flex justify-end mt-6"><button id="close-consult-modal-btn" class="py-2 px-6 rounded-lg btn-action">Fechar</button></div>
+        </div>
+    </div>
+
+    <script>
+        // --- SCRIPT START --- //
+
+        const DB_KEY = 'wallstreetDashboardData';
+        let db;
+
+        const categories = [ { id: 'conexao', name: 'Conexão', color: 'cyan', hex: '#22d3ee' }, { id: 'retencao_cat', name: 'Retenção', color: 'orange', hex: '#f97316' }, { id: 'introducao', name: 'Introdução', color: 'green', hex: '#22c55e' }, { id: 'evolucao', name: 'Evolução', color: 'red', hex: '#ef4444' }, { id: 'interacao', name: 'Interação', color: 'purple', hex: '#a855f7' }, { id: 'expansao', name: 'Expansão', color: 'yellow', hex: '#eab308' }];
+        const pastas = categories.map(c => c.name);
+        const premiosList = ['VIP PLATINA', 'VIP LANÇAMENTO', 'VIP OURO', 'VIP PRATA', 'VIP BRONZE', 'BATTLEPASS'];
+
+        let contratadosTimelineChart, retencaoTimelineChart, facTimelineChart, contratadosBarChart, retencaoBarChart, premiosPieChart;
+
+        // --- UTILITY FUNCTIONS --- //
+        const getTodayString = () => new Date().toISOString().split('T')[0];
+        const saveDb = () => localStorage.setItem(DB_KEY, JSON.stringify(db));
+        const loadDb = () => { const data = localStorage.getItem(DB_KEY); return data ? JSON.parse(data) : { dailyData: {}, premios: [], facData: {} }; };
+        const getWeekRange = (d) => { d = new Date(d); d.setHours(0,0,0,0); const day = d.getDay(); const diff = d.getDate() - day + (day === 0 ? -6 : 1); const monday = new Date(d.setDate(diff)); const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); return { start: monday.toISOString().split('T')[0], end: sunday.toISOString().split('T')[0] }; };
+        const getDateString = (date, daysAgo) => { const newDate = new Date(date); newDate.setDate(newDate.getDate() - daysAgo); return newDate.toISOString().split('T')[0]; }
+
+        // --- MODAL HANDLING & DYNAMIC CONTENT --- //
+        const fillModal = document.getElementById('fill-modal'), consultModal = document.getElementById('consult-modal');
+        const openModal = (modal) => { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+        const closeModal = (modal) => { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+        document.getElementById('open-fill-modal-btn').addEventListener('click', () => { document.getElementById('fill-date').value = getTodayString(); openModal(fillModal); });
+        const handleCloseModal = () => { resetFillModal(); closeModal(fillModal); }
+        document.getElementById('cancel-fill-btn').addEventListener('click', handleCloseModal);
+        document.getElementById('open-consult-modal-btn').addEventListener('click', () => { document.getElementById('consult-date').value = getTodayString(); openModal(consultModal);});
+        document.getElementById('close-consult-modal-btn').addEventListener('click', () => closeModal(consultModal));
+        const resetFillModal = () => { document.getElementById('fill-modal-content').querySelectorAll('input, select').forEach(el => { if (el.type === 'text' || el.type === 'number') el.value = ''; else if (el.tagName === 'SELECT') el.selectedIndex = 0; }); document.getElementById('fill-date').value = getTodayString(); };
+        const setupFillModal = () => {
+            document.getElementById('fill-categories').innerHTML = categories.map(cat => `<div class="p-3 rounded-lg modal-content text-center"><h4 class="font-semibold text-sm text-${cat.color}-400 mb-2">${cat.name}</h4><div class="space-y-2"><input type="number" data-id="${cat.id}" data-type="contratados" placeholder="Cont." class="w-full p-2 text-xs input-field"><input type="number" data-id="${cat.id}" data-type="retencao" placeholder="Ret." class="w-full p-2 text-xs input-field"></div></div>`).join('');
+            const pastaOptions = pastas.map(p => `<option value="${p}">${p}</option>`).join('');
+            const premioOptions = premiosList.map(p => `<option value="${p}">${p}</option>`).join('');
+            document.getElementById('premios-container').innerHTML = Array(3).fill(0).map(() => `<div class="grid grid-cols-1 md:grid-cols-3 gap-2 items-center premio-entry"><input type="text" placeholder="Nome da Pessoa" class="p-2 text-sm input-field premio-pessoa"><select class="p-2 text-sm select-field premio-pasta">${pastaOptions}</select><select class="p-2 text-sm select-field premio-nome">${premioOptions}</select></div>`).join('');
+            document.getElementById('fac-container').innerHTML = Array(6).fill(0).map(() => `<div class="grid grid-cols-2 md:grid-cols-3 gap-2 items-center fac-entry border border-gray-700 p-3 rounded-lg"><div class="col-span-2 md:col-span-3"><input type="text" placeholder="Nome FAC" class="w-full p-2 text-sm input-field fac-foco-nome"></div><div><select class="w-full p-2 text-sm select-field fac-foco-pasta">${pastaOptions}</select></div><div><input type="text" placeholder="Meta" class="w-full p-2 text-sm input-field fac-foco-meta"></div><div><input type="text" placeholder="Resp." class="w-full p-2 text-sm input-field fac-foco-resp"></div><div><select class="w-full p-2 text-sm select-field fac-foco-meta-batida"><option value="Não">Não</option><option value="Sim">Sim</option></select></div><div class="col-span-2 md:col-span-1"><input type="number" placeholder="Qtd. Levada" class="w-full p-2 text-sm input-field fac-foco-qtd"></div></div>`).join('');
+        };
+
+        // --- DATA SAVING --- //
+        document.getElementById('save-fill-btn').addEventListener('click', () => {
+            const date = document.getElementById('fill-date').value;
+            if (!date) { alert('Por favor, selecione uma data.'); return; }
+            db.dailyData[date] = {};
+            document.querySelectorAll('#fill-categories input[type="number"]').forEach(input => { const id = input.dataset.id; const type = input.dataset.type; if (!db.dailyData[date][id]) db.dailyData[date][id] = {}; db.dailyData[date][id][type] = parseInt(input.value) || 0; });
+            db.premios = db.premios.filter(p => p.date !== date); 
+            document.querySelectorAll('.premio-entry').forEach(entry => { const pessoa = entry.querySelector('.premio-pessoa').value.trim(); const pasta = entry.querySelector('.premio-pasta').value; const premio = entry.querySelector('.premio-nome').value; if(pessoa && pasta && premio) db.premios.push({ date, pessoa, pasta, premio }); });
+            db.facData[date] = [];
+            document.querySelectorAll('.fac-entry').forEach(entry => { const fac = entry.querySelector('.fac-foco-nome').value.trim(); if(fac) { db.facData[date].push({ fac, pasta: entry.querySelector('.fac-foco-pasta').value, meta: entry.querySelector('.fac-foco-meta').value, resp: entry.querySelector('.fac-foco-resp').value, metaBatida: entry.querySelector('.fac-foco-meta-batida').value, quantidade: parseInt(entry.querySelector('.fac-foco-qtd').value) || 0 }); }});
+            saveDb();
+            alert('Dados salvos com sucesso!');
+            handleCloseModal();
+            updateAllCharts();
+        });
+
+
+        // --- CHART & LEGEND RENDERING --- //
+        const createChart = (ctx, type, data, options) => new Chart(ctx, { type, data, options });
+        const createCustomLegend = () => categories.map(cat => `<div class="legend-item"><div class="legend-dot" style="background-color: ${cat.hex};"></div><span>${cat.name.toUpperCase()}</span></div>`).join('');
+        const renderCustomLegends = () => { const legendHTML = createCustomLegend(); document.getElementById('timeline-contratados-legend').innerHTML = legendHTML; document.getElementById('timeline-retencao-legend').innerHTML = legendHTML; document.getElementById('bar-contratados-legend').innerHTML = legendHTML; document.getElementById('bar-retencao-legend').innerHTML = legendHTML; document.getElementById('timeline-fac-legend').innerHTML = legendHTML;};
+        const externalTooltipHandler = (context, dataKeyExtractor) => {
+            const {chart, tooltip} = context; const tooltipEl = document.getElementById('chartjs-tooltip'); if (tooltip.opacity === 0) { tooltipEl.style.opacity = 0; return; }
+            const point = tooltip.dataPoints[0]; const currentDate = point.raw.x;
+            const dataKey = dataKeyExtractor(chart.canvas.id);
+            const getDataForDate = (date) => {
+                if (dataKey === 'fac') {
+                    return (db.facData[date] || []).reduce((sum, f) => sum + f.quantidade, 0);
+                }
+                return Object.values(db.dailyData[date] || {}).reduce((sum, cat) => sum + (cat[dataKey] || 0), 0);
+            };
+            let innerHtml = `<thead><tr><th>${new Date(currentDate).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</th></tr></thead><tbody>`;
+            innerHtml += `<tr><td><span class="tooltip-dot" style="background: #ef4444;"></span>Hoje: <b>${getDataForDate(currentDate)}</b></td></tr>`;
+            innerHtml += `<tr><td><span class="tooltip-dot" style="background: #eab308;"></span>7 dias atrás: <b>${getDataForDate(getDateString(currentDate, 7))}</b></td></tr>`;
+            innerHtml += `<tr><td><span class="tooltip-dot" style="background: #22c55e;"></span>14 dias atrás: <b>${getDataForDate(getDateString(currentDate, 14))}</b></td></tr></tbody>`;
+            tooltipEl.innerHTML = `<table>${innerHtml}</table>`; tooltipEl.style.opacity = 1; tooltipEl.style.left = chart.canvas.getBoundingClientRect().left + window.scrollX + tooltip.caretX + 'px'; tooltipEl.style.top = chart.canvas.getBoundingClientRect().top + window.scrollY + tooltip.caretY + 'px';
+        };
+        const timelineOptions = (canvasId) => ({ maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { display: false }, zoom: { pan: { enabled: true, mode: 'x' }, zoom: { wheel: { enabled: true }, pinch: { enabled: true }, mode: 'x' } }, tooltip: { enabled: false, external: (context) => externalTooltipHandler(context, id => id.includes('fac') ? 'fac' : (id.includes('contratados') ? 'contratados' : 'retencao')) } }, scales: { x: { type: 'time', time: { unit: 'day', tooltipFormat: 'dd/MM/yyyy' }, grid: { color: 'rgba(255, 255, 255, 0.1)' }, ticks: { color: '#9CA3AF' } }, y: { beginAtZero: true, grid: { color: 'rgba(255, 255, 255, 0.1)' }, ticks: { color: '#9CA3AF' } } } });
+        const createTimelineChart = (canvasId, dataKey) => { const ctx = document.getElementById(canvasId).getContext('2d'); const sortedDates = Object.keys(db.dailyData).sort(); const datasets = categories.map(cat => ({ label: cat.name, data: sortedDates.map(date => ({ x: date, y: db.dailyData[date]?.[cat.id]?.[dataKey] || 0 })), borderColor: cat.hex, backgroundColor: cat.hex + '33', fill: false, tension: 0.1 })); return createChart(ctx, 'line', { datasets }, timelineOptions(canvasId)); };
+        const createFacTimelineChart = () => { const ctx = document.getElementById('fac-timeline-chart').getContext('2d'); const sortedDates = Object.keys(db.facData).sort(); const datasets = categories.map(cat => ({ label: cat.name, data: sortedDates.map(date => ({ x: date, y: (db.facData[date] || []).filter(f => f.pasta === cat.name).reduce((sum, f) => sum + f.quantidade, 0) })), borderColor: cat.hex, backgroundColor: cat.hex + '33', fill: false, tension: 0.1 })); return createChart(ctx, 'line', { datasets }, timelineOptions('fac-timeline-chart'));};
+        const createBarChart = (canvasId, dataKey) => { const ctx = document.getElementById(canvasId).getContext('2d'); return createChart(ctx, 'bar', { labels: categories.map(c => c.name), datasets: [{ label: dataKey, data: [], backgroundColor: categories.map(c => c.hex) }] }, { maintainAspectRatio: false, plugins: { legend: {display: false} }, scales: { x: { ticks: { color: 'transparent' } }, y: { grid: { color: 'rgba(255, 255, 255, 0.1)'}, ticks: { color: '#9CA3AF' } } } }); };
+        const createPieChart = () => { const ctx = document.getElementById('premios-pie-chart').getContext('2d'); const pastaCounts = db.premios.reduce((acc, p) => { acc[p.pasta] = (acc[p.pasta] || 0) + 1; return acc; }, {}); const sortedPastas = Object.entries(pastaCounts).sort(([,a],[,b]) => b-a); const pieColors = ['#34D399', '#FBBF24', '#F87171', '#60A5FA', '#818CF8', '#A78BFA']; return createChart(ctx, 'pie', { labels: sortedPastas.map(p => p[0]), datasets: [{ data: sortedPastas.map(p => p[1]), backgroundColor: pieColors, hoverOffset: 4 }] }, { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#E0E0E0' } } } }); };
+
+        // --- UPDATE & FILTER LOGIC --- //
+        const updateAllCharts = () => { updateTimelineCharts(); updateBarCharts(document.getElementById('main-date-filter').value); updateWeeklyStatus(document.getElementById('weekly-status-date').value); updateFacWeeklyStatus(document.getElementById('weekly-status-fac-date').value); updatePieChart(); };
+        const updateTimelineCharts = () => { if (contratadosTimelineChart) contratadosTimelineChart.destroy(); if (retencaoTimelineChart) retencaoTimelineChart.destroy(); if(facTimelineChart) facTimelineChart.destroy(); contratadosTimelineChart = createTimelineChart('contratados-timeline-chart', 'contratados'); retencaoTimelineChart = createTimelineChart('retencao-timeline-chart', 'retencao'); facTimelineChart = createFacTimelineChart(); };
+        const updateBarCharts = (date) => { const dataForDay = db.dailyData[date] || {}; if(contratadosBarChart) { contratadosBarChart.data.datasets[0].data = categories.map(cat => dataForDay[cat.id]?.contratados || 0); contratadosBarChart.update(); } if(retencaoBarChart) { retencaoBarChart.data.datasets[0].data = categories.map(cat => dataForDay[cat.id]?.retencao || 0); retencaoBarChart.update(); } };
+        const updatePieChart = () => { if (premiosPieChart) premiosPieChart.destroy(); premiosPieChart = createPieChart(); }
+        const updateWeeklyStatus = (dateString) => { const container = document.querySelector('#status-semanal .space-y-3'); container.innerHTML = ''; const { start, end } = getWeekRange(new Date(dateString)); categories.forEach(cat => { let totalContratados = 0, totalRetencao = 0; for (const date in db.dailyData) { if(date >= start && date <= end && db.dailyData[date][cat.id]) { totalContratados += db.dailyData[date][cat.id].contratados || 0; totalRetencao += db.dailyData[date][cat.id].retencao || 0; } } const retencaoPercent = totalContratados > 0 ? (totalRetencao / totalContratados) * 100 : 0; let status, color; if (totalContratados >= 200 && retencaoPercent >= 45) { status = 'EXCELENTE'; color = 'text-emerald-400'; } else if (totalContratados >= 150 && retencaoPercent >= 40) { status = 'ÓTIMO'; color = 'text-green-400'; } else if (totalContratados >= 100 && retencaoPercent >= 35) { status = 'BOM'; color = 'text-cyan-400'; } else if (totalContratados >= 50 && retencaoPercent >= 30) { status = 'SATISFATÓRIO'; color = 'text-green-500'; } else if (totalContratados > 0) { status = 'MÉDIO'; color = 'text-yellow-500'; } else { status = 'RUIM'; color = 'text-red-500'; } container.innerHTML += `<div class="flex justify-between items-center text-sm"><span class="font-semibold text-${cat.color}-400">${cat.name}</span><span class="font-bold ${color}">${status}</span></div>`; }); };
+        const updateFacWeeklyStatus = (dateString) => { const container = document.querySelector('#status-semanal-fac .space-y-3'); container.innerHTML = ''; const { start, end } = getWeekRange(new Date(dateString)); categories.forEach(cat => { let metasBatidas = 0; for(const date in db.facData) { if(date >= start && date <= end) { metasBatidas += (db.facData[date] || []).filter(f => f.pasta === cat.name && f.metaBatida === 'Sim').length; }} let status, color; if (metasBatidas >= 7) { status = 'EXCELENTE'; color = 'text-emerald-400';} else if (metasBatidas >= 6) { status = 'ÓTIMO'; color = 'text-green-400';} else if (metasBatidas >= 5) { status = 'BOM'; color = 'text-cyan-400';} else if (metasBatidas >= 4) { status = 'SATISFATÓRIO'; color = 'text-green-500';} else if (metasBatidas >= 2) { status = 'MÉDIO'; color = 'text-yellow-500';} else { status = 'RUIM'; color = 'text-red-500'; } container.innerHTML += `<div class="flex justify-between items-center text-sm"><span class="font-semibold text-${cat.color}-400">${cat.name}</span><span class="font-bold ${color}">${status} (${metasBatidas})</span></div>`; });};
+
+        // --- EVENT LISTENERS --- //
+        document.getElementById('main-date-filter').addEventListener('change', (e) => updateBarCharts(e.target.value));
+        ['weekly-status-date', 'weekly-status-fac-date'].forEach(id => document.getElementById(id).addEventListener('change', (e) => id.includes('fac') ? updateFacWeeklyStatus(e.target.value) : updateWeeklyStatus(e.target.value)));
+        ['weekly-status-reset', 'weekly-status-fac-reset'].forEach(id => document.getElementById(id).addEventListener('click', () => { const today = getTodayString(); const dateInputId = id.replace('reset', 'date'); document.getElementById(dateInputId).value = today; id.includes('fac') ? updateFacWeeklyStatus(today) : updateWeeklyStatus(today); }));
+        const applyDateFilter = (chart, start, end) => { if (chart && start && end) { chart.options.scales.x.min = start; chart.options.scales.x.max = end; chart.update(); } };
+        const resetZoomAndFilter = (chart) => { if (chart) { delete chart.options.scales.x.min; delete chart.options.scales.x.max; chart.resetZoom(); chart.update(); } };
+        document.getElementById('compare-btn-contratados').addEventListener('click', () => applyDateFilter(contratadosTimelineChart, document.getElementById('compare-start-date-contratados').value, document.getElementById('compare-end-date-contratados').value));
+        document.getElementById('reset-zoom-contratados').addEventListener('click', () => resetZoomAndFilter(contratadosTimelineChart));
+        document.getElementById('compare-btn-retencao').addEventListener('click', () => applyDateFilter(retencaoTimelineChart, document.getElementById('compare-start-date-retencao').value, document.getElementById('compare-end-date-retencao').value));
+        document.getElementById('reset-zoom-retencao').addEventListener('click', () => resetZoomAndFilter(retencaoTimelineChart));
+        document.getElementById('compare-btn-fac').addEventListener('click', () => applyDateFilter(facTimelineChart, document.getElementById('compare-start-date-fac').value, document.getElementById('compare-end-date-fac').value));
+        document.getElementById('reset-zoom-fac').addEventListener('click', () => resetZoomAndFilter(facTimelineChart));
+        document.getElementById('consult-rank-btn').addEventListener('click', () => { const date = document.getElementById('consult-date').value; const resultsContainer = document.getElementById('consult-results'); if (!date) { resultsContainer.innerHTML = '<p class="text-red-500">Selecione uma data.</p>'; return; } const premiosDoDia = db.premios.filter(p => p.date === date); if(premiosDoDia.length === 0) { resultsContainer.innerHTML = '<p>Nenhum prêmio registrado.</p>'; return; } resultsContainer.innerHTML = '<h3 class="font-bold mb-2">Ganhadores do Dia</h3>' + premiosDoDia.map((p, i) => `<p><strong>${i+1}º:</strong> ${p.pessoa} (${p.pasta}) - <span class="text-yellow-400">${p.premio}</span></p>`).join(''); });
+
+        // --- DATA MANAGEMENT --- //
+        document.getElementById('export-data-btn').addEventListener('click', () => { const dataStr = JSON.stringify(db); const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr); const exportFileDefaultName = `wallstreet_data_${getTodayString()}.json`; const linkElement = document.createElement('a'); linkElement.setAttribute('href', dataUri); linkElement.setAttribute('download', exportFileDefaultName); linkElement.click(); });
+        document.getElementById('import-data-btn').addEventListener('click', () => document.getElementById('import-file-input').click());
+        document.getElementById('import-file-input').addEventListener('change', (event) => { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = (e) => { try { const importedDb = JSON.parse(e.target.result); if(importedDb.dailyData && importedDb.premios && importedDb.facData) { if(confirm('Isso irá substituir todos os dados atuais. Deseja continuar?')) { db = importedDb; saveDb(); initializeApp(); } } else { alert('Arquivo de dados inválido ou corrompido.'); } } catch (err) { alert('Erro ao ler o arquivo.'); console.error(err); } finally { event.target.value = null; } }; reader.readAsText(file); });
+
+        // --- INITIALIZATION --- //
+        const initializeApp = () => {
+            db = loadDb(); const today = getTodayString();
+            document.getElementById('main-date-filter').value = today; document.getElementById('consult-date').value = today;
+            document.getElementById('weekly-status-date').value = today; document.getElementById('weekly-status-fac-date').value = today;
+            setupFillModal(); renderCustomLegends();
+            contratadosBarChart = createBarChart('contratados-bar-chart', 'Contratados'); retencaoBarChart = createBarChart('retencao-bar-chart', 'Retenção');
+            updateAllCharts();
+        };
+
+        initializeApp();
+    </script>
+</body>
+</html>
