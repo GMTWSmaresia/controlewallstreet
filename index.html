@@ -50,14 +50,12 @@
                 <div class="flex flex-wrap justify-between items-center mb-4 gap-4" id="controls-retencao"><h2 class="text-lg font-semibold text-white">LINHA DO TEMPO - RETENÇÃO</h2><div class="flex items-center space-x-2"><input type="date" class="input-field p-1 text-sm compare-start-date" title="Data Início"><input type="date" class="input-field p-1 text-sm compare-end-date" title="Data Fim"><button class="text-yellow-400 border border-yellow-400 rounded-lg py-1 px-3 text-sm font-semibold hover:bg-yellow-400 hover:text-black transition-colors btn-compare">COMPARAR</button><button class="text-purple-400 border border-purple-400 rounded-lg py-1 px-3 text-sm font-semibold hover:bg-purple-400 hover:text-black transition-colors btn-anotacao" data-key="retencao">ANOTAÇÃO</button><button class="text-white border border-gray-500 rounded-lg py-1 px-3 text-sm font-semibold btn-action btn-reset-chart">RESET</button></div></div>
                 <div class="relative flex-grow h-64"><canvas id="retencao-timeline-chart"></canvas></div><div id="timeline-retencao-legend" class="custom-legend"></div>
             </div>
-            <div class="border chart-border rounded-xl p-6 flex flex-col">
-                 <h2 class="text-lg font-semibold text-white mb-4">CONTRATADOS DIÁRIO</h2>
-                 <div class="relative flex-grow h-64"><canvas id="contratados-bar-chart"></canvas></div><div id="bar-contratados-legend" class="custom-legend"></div>
+            
+            <div class="lg:col-span-2 border chart-border rounded-xl p-6 flex flex-col">
+                 <h2 class="text-lg font-semibold text-white mb-4 text-center">CONTRATADOS X RETENÇÃO</h2>
+                 <div class="relative flex-grow h-64"><canvas id="contratados-retencao-bar-chart"></canvas></div>
             </div>
-            <div class="border chart-border rounded-xl p-6 flex flex-col">
-                <h2 class="text-lg font-semibold text-white mb-4">RETENÇÃO DIÁRIO</h2>
-                <div class="relative flex-grow h-64"><canvas id="retencao-bar-chart"></canvas></div><div id="bar-retencao-legend" class="custom-legend"></div>
-            </div>
+
              <div class="border chart-border rounded-xl p-6 flex flex-col">
                 <div class="flex flex-wrap justify-between items-center mb-4 gap-4" id="controls-fac"><h2 class="text-lg font-semibold text-white">FACÇÕES EM FOCO</h2><div class="flex items-center space-x-2"><input type="date" class="input-field p-1 text-sm compare-start-date" title="Data Início"><input type="date" class="input-field p-1 text-sm compare-end-date" title="Data Fim"><button class="text-yellow-400 border border-yellow-400 rounded-lg py-1 px-3 text-sm font-semibold hover:bg-yellow-400 hover:text-black transition-colors btn-compare">COMPARAR</button><button class="text-purple-400 border border-purple-400 rounded-lg py-1 px-3 text-sm font-semibold hover:bg-purple-400 hover:text-black transition-colors btn-anotacao" data-key="fac">ANOTAÇÃO</button><button class="text-white border border-gray-500 rounded-lg py-1 px-3 text-sm font-semibold btn-action btn-reset-chart">RESET</button></div></div>
                 <div class="relative flex-grow h-64"><canvas id="fac-timeline-chart"></canvas></div><div id="timeline-fac-legend" class="custom-legend"></div>
@@ -217,9 +215,7 @@
                     }).join('');
                 }
             });
-            const barLegendHTML = categories.map(cat => `<div class="legend-item" style="cursor:default;"><div class="legend-dot" style="background-color: ${cat.hex};"></div><span>${cat.name.toUpperCase()}</span></div>`).join('');
-            document.getElementById('bar-contratados-legend').innerHTML = barLegendHTML;
-            document.getElementById('bar-retencao-legend').innerHTML = barLegendHTML;
+            // Custom legend for the unified bar chart is now handled by Chart.js itself
         };
         const externalTooltipHandler = (context) => {
             const {chart, tooltip} = context; const tooltipEl = document.getElementById('chartjs-tooltip'); if (tooltip.opacity === 0) { tooltipEl.style.opacity = 0; return; }
@@ -244,11 +240,43 @@
             let datasets = categories.map(cat => ({ label: cat.name, data: sortedDates.map(date => ({ x: date, y: (db.facData[date] || []).filter(f => f.pasta === cat.name).reduce((sum, f) => sum + f.quantidade, 0) })), borderColor: cat.hex, fill: false, tension: 0.1 }));
             return createChart(ctx, 'line', { datasets }, timelineOptions());
         };
-        const createBarChart = (canvasId, dataKey) => { const ctx = document.getElementById(canvasId).getContext('2d'); return createChart(ctx, 'bar', { labels: categories.map(c => c.name), datasets: [{ label: dataKey, data: [], backgroundColor: categories.map(c => c.hex) }] }, { maintainAspectRatio: false, plugins: { legend: {display: false} }, scales: { x: { ticks: { color: 'transparent' } }, y: { grid: { color: 'rgba(255, 255, 255, 0.1)'}, ticks: { color: '#9CA3AF' } } } }); };
+        const createContratadosRetencaoChart = () => {
+            const ctx = document.getElementById('contratados-retencao-bar-chart').getContext('2d');
+            return createChart(ctx, 'bar', {
+                labels: categories.map(c => c.name),
+                datasets: [
+                    {
+                        label: 'Contratados',
+                        data: [],
+                        backgroundColor: '#22d3ee', // Cyan
+                    },
+                    {
+                        label: 'Retenção',
+                        data: [],
+                        backgroundColor: '#f97316', // Orange
+                    }
+                ]
+            }, {
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'bottom',
+                        labels: {
+                            color: '#E0E0E0'
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: '#9CA3AF' }, grid: { display: false } },
+                    y: { grid: { color: 'rgba(255, 255, 255, 0.1)'}, ticks: { color: '#9CA3AF' } }
+                }
+            });
+        };
         const createPieChart = () => { const ctx = document.getElementById('premios-pie-chart').getContext('2d'); const pastaCounts = db.premios.reduce((acc, p) => { acc[p.pasta] = (acc[p.pasta] || 0) + 1; return acc; }, {}); const sortedPastas = Object.entries(pastaCounts).sort(([,a],[,b]) => b-a); return createChart(ctx, 'pie', { labels: sortedPastas.map(p => p[0]), datasets: [{ data: sortedPastas.map(p => p[1]), backgroundColor: ['#F472B6', '#38BDF8', '#8B5CF6'].concat(categories.map(c=>c.hex)), hoverOffset: 4 }] }, { maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { color: '#E0E0E0' } } } }); };
 
         // --- UPDATE & FILTER LOGIC --- //
-        const updateAllCharts = () => { updateTimelineCharts(); updateBarCharts(document.getElementById('main-date-filter').value); updateWeeklyStatus(document.getElementById('weekly-status-date').value); updateFacWeeklyStatus(document.getElementById('weekly-status-fac-date').value); updatePieChart(); renderCustomLegends(); };
+        const updateAllCharts = () => { updateTimelineCharts(); updateContratadosRetencaoChart(document.getElementById('main-date-filter').value); updateWeeklyStatus(document.getElementById('weekly-status-date').value); updateFacWeeklyStatus(document.getElementById('weekly-status-fac-date').value); updatePieChart(); renderCustomLegends(); };
         const updateTimelineCharts = () => {
              ['contratados', 'retencao', 'fac'].forEach(key => {
                 const chartKey = `${key}TimelineChart`; if (chartInstances[chartKey]) chartInstances[chartKey].destroy();
@@ -256,7 +284,15 @@
                 else { chartInstances[chartKey] = createTimelineChart(`${key}-timeline-chart`, key); }
             });
         };
-        const updateBarCharts = (date) => { const dataForDay = db.dailyData[date] || {}; if(chartInstances.contratadosBarChart) { chartInstances.contratadosBarChart.data.datasets[0].data = categories.map(cat => dataForDay[cat.id]?.contratados || 0); chartInstances.contratadosBarChart.update(); } if(chartInstances.retencaoBarChart) { chartInstances.retencaoBarChart.data.datasets[0].data = categories.map(cat => dataForDay[cat.id]?.retencao || 0); chartInstances.retencaoBarChart.update(); } };
+        const updateContratadosRetencaoChart = (date) => {
+            const dataForDay = db.dailyData[date] || {};
+            if (chartInstances.contratadosRetencaoBarChart) {
+                const chart = chartInstances.contratadosRetencaoBarChart;
+                chart.data.datasets[0].data = categories.map(cat => dataForDay[cat.id]?.contratados || 0);
+                chart.data.datasets[1].data = categories.map(cat => dataForDay[cat.id]?.retencao || 0);
+                chart.update();
+            }
+        };
         const updatePieChart = () => { if (chartInstances.premiosPieChart) chartInstances.premiosPieChart.destroy(); chartInstances.premiosPieChart = createPieChart(); }
         const updateWeeklyStatus = (dateString) => { const container = document.querySelector('#status-semanal .space-y-3'); container.innerHTML = ''; const { start, end } = getWeekRange(dateString); categories.forEach(cat => { let totalContratados = 0; let totalRetencao = 0; for (const date in db.dailyData) { if(date >= start && date <= end && db.dailyData[date]?.[cat.id]) { totalContratados += db.dailyData[date][cat.id].contratados || 0; totalRetencao += db.dailyData[date][cat.id].retencao || 0; } } const retencaoPercent = totalContratados > 0 ? (totalRetencao / totalContratados) * 100 : 0; let status, color; const minRec = 400, maxRec = 1100, minRet = 20, maxRet = 45; const recScore = totalContratados <= minRec ? 0 : Math.min(1, (totalContratados - minRec) / (maxRec - minRec)); const retScore = retencaoPercent <= minRet ? 0 : Math.min(1, (retencaoPercent - minRet) / (maxRet - minRet)); const finalScore = totalContratados > 0 ? (recScore + retScore) / 2 : 0; if (finalScore >= 0.9) { status = 'EXCELENTE'; color = 'text-emerald-400'; } else if (finalScore >= 0.7) { status = 'ÓTIMO'; color = 'text-green-400'; } else if (finalScore >= 0.5) { status = 'BOM'; color = 'text-cyan-400'; } else if (finalScore > 0) { status = 'SATISFATÓRIO'; color = 'text-green-500'; } else { status = 'RUIM'; color = 'text-red-500'; } container.innerHTML += `<div class="flex justify-between items-center text-sm"><span class="font-semibold text-${cat.color}-400">${cat.name}</span><span class="font-bold ${color}">${status}</span></div>`; });};
         const updateFacWeeklyStatus = (dateString) => { const container = document.querySelector('#status-semanal-fac .space-y-3'); container.innerHTML = ''; const { start, end } = getWeekRange(dateString); categories.forEach(cat => { let metasBatidas = 0; for(const date in db.facData) { if(date >= start && date <= end) { metasBatidas += (db.facData[date] || []).filter(f => f.pasta === cat.name && f.metaBatida === 'Sim' && (parseInt(f.quantidade, 10) >= parseInt(f.meta, 10))).length; }} let status, color; if (metasBatidas >= 7) { status = 'EXCELENTE'; color = 'text-emerald-400';} else if (metasBatidas === 6) { status = 'ÓTIMO'; color = 'text-green-400';} else if (metasBatidas === 5) { status = 'BOM'; color = 'text-cyan-400';} else if (metasBatidas === 4) { status = 'SATISFATÓRIO'; color = 'text-green-500';} else if (metasBatidas === 3) { status = 'MÉDIO'; color = 'text-yellow-500';} else { status = 'RUIM'; color = 'text-red-500'; } container.innerHTML += `<div class="flex justify-between items-center text-sm"><span class="font-semibold text-${cat.color}-400">${cat.name}</span><span class="font-bold ${color}">${status} (${metasBatidas})</span></div>`; });};
@@ -310,7 +346,7 @@
         // --- EVENT LISTENERS --- //
         document.getElementById('main-date-filter').addEventListener('change', (e) => {
             const newDate = e.target.value;
-            updateBarCharts(newDate);
+            updateContratadosRetencaoChart(newDate);
             document.getElementById('weekly-status-date').value = newDate;
             document.getElementById('weekly-status-fac-date').value = newDate;
             updateWeeklyStatus(newDate);
@@ -353,8 +389,7 @@
             document.getElementById('main-date-filter').value = today; document.getElementById('consult-date').value = today;
             document.getElementById('weekly-status-date').value = today; document.getElementById('weekly-status-fac-date').value = today;
             setupFillModal(); 
-            chartInstances.contratadosBarChart = createBarChart('contratados-bar-chart', 'Contratados'); 
-            chartInstances.retencaoBarChart = createBarChart('retencao-bar-chart', 'Retenção');
+            chartInstances.contratadosRetencaoBarChart = createContratadosRetencaoChart();
             updateAllCharts();
         };
 
